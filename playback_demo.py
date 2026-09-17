@@ -1,196 +1,230 @@
 """
-This script is for replaying demonstrations from .pkl files and from the RLDS files
-for verification and debugging purposes.
+This script is for replaying demonstrations from .h5 files.
 
 In order to run this script, you need to have the following running on the NUC
 
 cd deoxys_control/deoxys && ./auto_scripts/auto_arm.sh config/charmander.yml
 cd deoxys_control/deoxys && ./auto_scripts/auto_gripper.sh config/charmander.yml
-
 """
 
-# deoxys_control
-from deoxys.franka_interface import FrankaInterface
-import deoxys.proto.franka_interface.franka_controller_pb2 as franka_controller_pb2
-from deoxys.utils.config_utils import get_default_controller_config
-from deoxys.utils.log_utils import get_deoxys_example_logger
-from examples.osc_control import move_to_target_pose, deltas_move
-from deoxys.experimental.motion_utils import reset_joints_to
-from deoxys.utils.transform_utils import quat2axisangle, mat2euler, mat2quat, quat_distance, quat2mat, euler2mat, axisangle2quat, quat_multiply
-
-# General
-import numpy as np
-import pickle as pkl
-import h5py
-import tensorflow_datasets as tfds
-import math
 import argparse
-import cv2
-from time import sleep
-import sys
-import importlib
-from scipy.spatial.transform import Rotation as R
+import json
 import os
 import time
-from openteach.utils.timer import FrequencyTimer
+
+import h5py
+import numpy as np
+import paramiko
+import yaml
+from deoxys.experimental.motion_utils import reset_joints_to
 from easydict import EasyDict
-from matplotlib import pyplot as plt
+
+from openteach.components.operators.franka import (
+    CONFIG_ROOT,
+    CONTROL_FREQ,
+    CONTROL_MODE_OPTIONS,
+    ROTATION_VELOCITY_LIMIT,
+    STATE_FREQ,
+    TRANSLATION_VELOCITY_LIMIT,
+    FrankaArmOperator,
+)
+from openteach.constants import VR_FREQ
 
 parser = argparse.ArgumentParser()
-parser.add_argument("demo", type=str, help="The name of the demonstration to visualize")
-
-DEFAULT_CONTROLLER = EasyDict({
-    'controller_type': 'OSC_POSE',
-    'is_delta': False,
-    'traj_interpolator_cfg': {
-        'traj_interpolator_type': 'LINEAR_POSE',
-        'time_fraction': 0.3
-    },
-    'Kp': {
-        'translation': [250.0, 250.0, 250.0],
-        'rotation': [250.0, 250.0, 250.0]
-    },
-    'action_scale': {
-        'translation': 1.0,
-        'rotation': 1.0
-    },
-    'residual_mass_vec': [0.0, 0.0, 0.0, 0.0, 0.1, 0.5, 0.5],
-    'state_estimator_cfg': {
-        'is_estimation': False,
-        'state_estimator_type': 'EXPONENTIAL_SMOOTHING',
-        'alpha_q': 0.9,
-        'alpha_dq': 0.9,
-        'alpha_eef': 1.0,
-        'alpha_eef_vel': 1.0
-    }
-})
-
-CMD_ACTION_CONTROLLER = EasyDict({
-    'controller_type': 'OSC_POSE',
-    'is_delta': False,
-    'traj_interpolator_cfg': {
-        'traj_interpolator_type': 'LINEAR_POSE',
-        'time_fraction': 0.3
-    },
-    'Kp': {
-        'translation': [250.0, 250.0, 250.0],
-        'rotation': [250.0, 250.0, 250.0]
-    },
-    'action_scale': {
-        'translation': 1.0,
-        'rotation': 1.0
-    },
-    'residual_mass_vec': [0.0, 0.0, 0.0, 0.0, 0.1, 0.5, 0.5],
-    'state_estimator_cfg': {
-        'is_estimation': False,
-        'state_estimator_type': 'EXPONENTIAL_SMOOTHING',
-        'alpha_q': 0.9,
-        'alpha_dq': 0.9,
-        'alpha_eef': 1.0,
-        'alpha_eef_vel': 1.0
-    }
-})
-
-def replay_from_rlds(args):
-    robot_interface = FrankaInterface(
-        os.path.join('/home/ripl/openteach/configs', 'deoxys.yml'), use_visualizer=False,
-        control_freq=5,
-        state_freq=200
-    )
-    reset_joint_positions = [
-            0.09162008114028396,
-            -0.19826458111314524,
-            -0.01990020486871322,
-            -2.4732269941140346,
-            -0.01307073642274261,
-            2.30396583422025,
-            0.8480939705504309,
-        ]
-    reset_joints_to(robot_interface, reset_joint_positions)
-
-    # Load demonstration data
-    sys.path.append("/home/ripl/rlds_dataset_builder")
-    # ds = tfds.load("franka_pick_coke_single", split='train')
-    ds = tfds.load("franka_pick_coke_single", split='train')
-
-    # timer = FrequencyTimer(15)
-    for episode in ds.take(1):
-        for st in episode['steps']:
-            # breakpoint()
-            # timer.start_loop()
-            deltas = st['action'].numpy()  # the action are deltas for (x, y, z, r, p, y, gripper)
-            cv2.imshow("image", st['observation']['image'].numpy()[:, :, ::-1])  # convert to BGR for cv2
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-            # convert rpy to exponential axis-angle
-            deltas[3:6] = quat2axisangle(mat2quat(euler2mat(deltas[3:6])))
-            print(deltas)
-            robot_interface.control(
-                    controller_type='OSC_POSE',
-                    action=deltas[:6],
-                    controller_cfg=DEFAULT_CONTROLLER,
-                )
-            robot_interface.gripper_control(deltas[6])
-            # timer.end_loop()
+parser.add_argument("--reverse", action="store_true", help="Reverse the demonstration playback.")
+parser.add_argument("--demo_num", type=str, help="The demo number or .h5 path to replay.")
+parser.add_argument("--suffix", type=str, help="Additional suffix after \"playback\".")
+parser.add_argument(
+    "--control_mode",
+    type=str,
+    choices=sorted(set(CONTROL_MODE_OPTIONS)),
+    default=None,
+    help="Override control mode recorded in the demo file.",
+)
+parser.add_argument(
+    "--gripper_shift",
+    type=int,
+    default=None,
+    help="Shift reversed gripper commands forward by this many control steps. Only valid with --reverse.",
+)
 
 
+def load_controller_cfg(controller_cfg_json):
+    if isinstance(controller_cfg_json, np.bytes_):
+        controller_cfg_json = controller_cfg_json.tobytes()
+    if isinstance(controller_cfg_json, bytes):
+        controller_cfg_json = controller_cfg_json.decode("utf-8")
+    return EasyDict(json.loads(controller_cfg_json))
 
-def replay_from_pkl(args):
-    home = os.path.expanduser("~")
-    # Load demonstration data
-    filename = f"/home/ripl/Desktop/blocks/demo_000.pkl"
-    # arm_cmd_file = f"/home/ripl/openteach/extracted_data/pick_coke/demonstration_coke18/franka_arm_tcp_commands.h5"
-    with open(filename, 'rb') as dbfile:
-        db = pkl.load(dbfile)
-    # breakpoint()
-    pos = db['eef_pos'].squeeze() + db['arm_action'][:, :3]
-    quat_rot_actions = [axisangle2quat(x) for x in db['arm_action'][:, 3:]]
-    rot = np.array([
-        quat2axisangle(quat_multiply(i, j)) for i,j in \
-            zip(quat_rot_actions, db['eef_quat'])
-            ])
-    arm_action = np.hstack((pos, rot))
 
-    # breakpoint()
+def get_control_mode(controller_cfg):
+    control_mode = controller_cfg.get("control_mode")
+    if control_mode is not None:
+        if control_mode not in CONTROL_MODE_OPTIONS:
+            raise ValueError(f"Invalid recorded control mode: {control_mode}")
+        return control_mode
 
-    # images = []
-    # for i in db['rgb_frames'][:, 2]: # grab from the right camera
-    #     images.append(cv2.cvtColor(i, cv2.COLOR_BGR2RGB))
-    #     cv2.imshow("Camera", i)  # convert back to BGR for cv2
-    #     if cv2.waitKey(30) & 0xFF == ord('q'):
-    #         break
-    # cv2.destroyAllWindows()
-    # image_strip = np.concatenate(images[::4], axis=1)
-    # plt.figure()
-    # plt.imshow(image_strip)
-    # plt.show()
-    # breakpoint()
-    robot_interface = FrankaInterface(
-        os.path.join('/home/ripl/openteach/configs', 'deoxys.yml'), use_visualizer=False,
-        control_freq=5,  # setting control frequency here so we don't have to handle it with a timer
-        state_freq=200
-    )
-    # timer = FrequencyTimer(15)
 
-    # move robot to start position
-    reset_joints_to(robot_interface, db['joint_pos'][0])
-    for i in range(0, len(arm_action)):
-        # timer.start_loop()
+def get_arm_control_kwargs(control_mode, arm_action, target_pose, gripper_cmd):
+    if control_mode == "eef_delta_actions":
+        return {"action": arm_action, "gripper_cmd": gripper_cmd}
+    return {"target_pose": target_pose, "gripper_cmd": gripper_cmd}
 
-        deltas = arm_action[i]
 
-        robot_interface.control(
-                controller_type=DEFAULT_CONTROLLER["controller_type"],
-                action=deltas,
-                controller_cfg=DEFAULT_CONTROLLER,
+def get_demo_filename(demo_num):
+    if demo_num.endswith(".h5"):
+        return os.path.expanduser(demo_num)
+    return f"/home/jeremiah/openteach/extracted_data/demonstration_{demo_num}/demo_{demo_num}.h5"
+
+
+def get_demo_number(filename):
+    demo_name = os.path.splitext(os.path.basename(filename))[0]
+    return demo_name[5:] if demo_name.startswith("demo_") else demo_name
+
+
+def check_nuc_hash_and_diff():
+    """This is to ensure there are no changes on the NUC that would affect playback."""
+    s = time.time()
+    with open(os.path.join(CONFIG_ROOT, "deoxys.yml"), "r") as f:
+        deoxys_cfg = EasyDict(yaml.safe_load(f))
+    expected_hash = "ad7eaee1ce5b033602906e9891ef124eb2eb30f9"
+    repo_path = "/home/ripl/deoxys_control"  # path on the NUC
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(
+            hostname=deoxys_cfg.NUC.IP,
+            username="ripl",
+            timeout=5,
+            banner_timeout=5,
+            auth_timeout=5,
+            allow_agent=True,
+            look_for_keys=True,
+        )
+        status_cmd = f"cd {repo_path} && git status --porcelain"
+        hash_cmd = f"cd {repo_path} && git rev-parse HEAD"
+        _, status_stdout, status_stderr = client.exec_command(status_cmd, timeout=5)
+        status_output = status_stdout.read().decode("utf-8", errors="replace").strip()
+        status_error = status_stderr.read().decode("utf-8", errors="replace").strip()
+        if status_error:
+            raise RuntimeError(f"Failed to check git status on NUC: {status_error}")
+        if status_output:
+            raise RuntimeError("NUC deoxys_control has uncommitted changes.")
+        _, hash_stdout, hash_stderr = client.exec_command(hash_cmd, timeout=5)
+        current_hash = hash_stdout.read().decode("utf-8", errors="replace").strip()
+        hash_error = hash_stderr.read().decode("utf-8", errors="replace").strip()
+        if hash_error:
+            raise RuntimeError(f"Failed to get git hash on NUC: {hash_error}")
+        if current_hash != expected_hash:
+            raise RuntimeError(
+                f"NUC deoxys_control hash mismatch: expected {expected_hash}, got {current_hash}"
             )
+    finally:
+        client.close()
+    print("NUC deoxys_control repository is clean and matches expected hash.")
+    print(f"NUC check took {time.time() - s:.2f} seconds.")
 
-        robot_interface.gripper_control(db["gripper_action"][i])
-        # timer.end_loop()
+
+def replay_from_h5(args):
+    filename = get_demo_filename(args.demo_num)
+
+    print()
+    print("=" * 50)
+    print(f"Replaying demonstration from {filename}...")
+    print("=" * 50)
+    print()
+
+    # load network config
+    with open(os.path.join(CONFIG_ROOT, "network.yaml"), "r") as f:
+        network_cfg = EasyDict(yaml.safe_load(f))
+
+    check_nuc_hash_and_diff()
+
+    with h5py.File(filename, "r") as h5f:
+        arm_action = h5f["arm_action"][:]
+        gripper_action = h5f["gripper_action"][:]
+        joint_pos = h5f["joint_pos"][:]
+        controller_cfg_json = h5f.attrs["controller_cfg_json"]
+        controller_cfg = load_controller_cfg(controller_cfg_json)
+        recorded_control_mode = get_control_mode(controller_cfg)
+        control_mode = args.control_mode or recorded_control_mode
+        if control_mode is None:
+            raise ValueError("Could not determine control mode from demo. Provide --control_mode.")
+        cartesian_pose_cmd = h5f["cartesian_pose_cmd"][:]
+
+        if h5f.attrs["ROTATION_VELOCITY_LIMIT"] > ROTATION_VELOCITY_LIMIT:
+            raise ValueError("Playback rotation velocity limit does not match recorded rotation velocity limit.")
+        if h5f.attrs["TRANSLATION_VELOCITY_LIMIT"] > TRANSLATION_VELOCITY_LIMIT:
+            raise ValueError("Playback translation velocity limit does not match recorded translation velocity limit.")
+        assert CONTROL_FREQ == h5f.attrs["VR_FREQ"]
+        assert STATE_FREQ > CONTROL_FREQ
+
+    demo_number = get_demo_number(filename)
+    recording_name = demo_number + "_playback"
+    if args.reverse:
+        recording_name += "_reversed"
+        if control_mode == "eef_delta_actions":
+            if not controller_cfg["is_delta"]:
+                raise NotImplementedError
+            arm_action = -arm_action[::-1]
+        else:
+            arm_action = arm_action[::-1]
+            cartesian_pose_cmd = cartesian_pose_cmd[::-1]
+        gripper_action = gripper_action[::-1]
+        joint_pos = joint_pos[::-1]
+        if args.gripper_shift:
+            gripper_action[:-args.gripper_shift] = gripper_action[args.gripper_shift:]
+    if args.suffix:
+        recording_name += f"_{args.suffix}"
+
+    if args.control_mode:
+        print(f"Overriding recorded control mode '{recorded_control_mode}' with '{args.control_mode}'.")
+    print(f"Playback control mode: {control_mode}")
+    print(f"Playback controller type: {controller_cfg.controller_type}")
+    print(f"Recording playback as {recording_name}...\n")
+    operator = FrankaArmOperator(
+        network_cfg["host_address"],
+        None,
+        None,
+        None,
+        use_filter=False,
+        arm_resolution_port = None,
+        teleoperation_reset_port = None,
+        record=recording_name,
+        control_mode=control_mode,
+        controller_cfg=controller_cfg,
+    )
+    # move robot to start position
+    try:
+        reset_joints_to(operator.robot_interface, joint_pos[0])
+        if control_mode == "absolute_eef_pose_direct":
+            operator.control_mode = "eef_delta_actions"
+        for i in range(len(arm_action)):
+            # control_kwargs = get_arm_control_kwargs(
+            #     control_mode,
+            #     arm_action[i],
+            #     cartesian_pose_cmd[i],
+            #     gripper_action[i],
+            # )
+            if control_mode == "absolute_eef_pose_to_delta":
+                operator.arm_control(
+                    target_pose=cartesian_pose_cmd[i],
+                    gripper_cmd=gripper_action[i],
+                )
+            else:
+                operator.arm_control(action=arm_action[i], gripper_cmd=gripper_action[i])
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt detected. Saving playback history so far...")
+    finally:
+        operator.save_obs_cmd_history()
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    replay_from_pkl(args)
-    # replay_from_rlds(args)
+    if args.gripper_shift is not None and not args.reverse:
+        parser.error("--gripper_shift can only be used with --reverse.")
+    if args.gripper_shift is not None and args.gripper_shift < 0:
+        parser.error("--gripper_shift must be non-negative.")
+    if args.gripper_shift is None:
+        args.gripper_shift = 0
+    replay_from_h5(args)

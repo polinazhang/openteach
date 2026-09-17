@@ -1,7 +1,7 @@
-from openteach.constants import VR_FREQ,  ARM_LOW_RESOLUTION, ARM_HIGH_RESOLUTION ,ARM_TELEOP_STOP,ARM_TELEOP_CONT
 from openteach.components import Component
+from openteach.constants import ARM_TELEOP_CONT, ARM_TELEOP_STOP, VR_FREQ
+from openteach.utils.network import ZMQKeypointPublisher, create_pull_socket
 from openteach.utils.timer import FrequencyTimer
-from openteach.utils.network import create_pull_socket, ZMQKeypointPublisher, ZMQButtonFeedbackSubscriber
 
 
 class OculusVRHandDetector(Component):

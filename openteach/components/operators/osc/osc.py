@@ -1,33 +1,18 @@
-from isaacgym import gymapi, gymutil
 import numpy as np
-#from utils import clamp, AssetDesc
-import math
-import hydra
-from copy import copy
-import gym
-from gym.spaces import Box
+
 #import torch
-
-
-
-
-
-import cv2
-from plots.data_logging import Log, ListOfLogs, NoLog, SimpleLog
-from isaacgym import gymtorch
-from isaacgym.torch_utils import *
-import time
-#import torch
-
 #from isaacgymenvs.tasks.base.vec_task import VecTask
 #from isaacgymenvs.tasks.base.vec_task import VecTask
 #gym=gymapi.aquire_gym()
-
 #@hydra.main(version_base = '1.2', config_path = 'configs', config_name = 'envs')
-from isaacgym import gymapi
 import torch
-import numpy as np
-from oscar.utils.torch_utils import quat_mul, quat2mat, orientation_error, axisangle2quat
+from isaacgym import gymapi
+
+#from utils import clamp, AssetDesc
+#import torch
+from isaacgym.torch_utils import *
+from oscar.utils.torch_utils import axisangle2quat, orientation_error, quat2mat, quat_mul
+
 from .base_controller import Controller
 
 
@@ -131,7 +116,7 @@ class OSCController(Controller):
         for variable_gain, gain_limits, dim in zip(
             (self.variable_kp, self.variable_damping_ratio, self.variable_kp_null),
             (self.kp_limits, self.damping_ratio_limits, self.kp_null_limits),
-            (6, 6, self.control_dim),
+            (6, 6, self.control_dim), strict=True,
         ):
             if variable_gain:
                 # Add this to input / output limits

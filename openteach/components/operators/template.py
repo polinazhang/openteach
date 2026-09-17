@@ -1,25 +1,18 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import zmq
-
-from mpl_toolkits.mplot3d import Axes3D
-from tqdm import tqdm
-
 from copy import deepcopy as copy
-from asyncio import threads
-from openteach.constants import *
-from openteach.utils.timer import FrequencyTimer
-from openteach.utils.network import ZMQKeypointSubscriber, ZMQKeypointPublisher
-from openteach.utils.vectorops import *
-from openteach.utils.files import *
 
-from openteach.robot.robot import RobotWrapper
-from scipy.spatial.transform import Rotation, Slerp
-from .operator import Operator
-from scipy.spatial.transform import Rotation as R
+import numpy as np
+import zmq
 from numpy.linalg import pinv
+from scipy.spatial.transform import Rotation, Slerp
+from scipy.spatial.transform import Rotation as R
 
-
+from openteach.components.operators.operator_base import Operator
+from openteach.constants import *
+from openteach.robot.robot import RobotWrapper
+from openteach.utils.files import *
+from openteach.utils.network import ZMQKeypointPublisher, ZMQKeypointSubscriber
+from openteach.utils.timer import FrequencyTimer
+from openteach.utils.vectorops import *
 
 np.set_printoptions(precision=2, suppress=True)
 
@@ -349,7 +342,7 @@ class TemplateArmOperator(Operator):
         self.joint_publisher.pub_keypoints(joint_position,"joint")
         self.cartesian_command_publisher.pub_keypoints(final_pose, "cartesian")
 
-        if self.arm_teleop_state == ARM_TELEOP_CONT and gripper_flag == False:
+        if self.arm_teleop_state == ARM_TELEOP_CONT and not gripper_flag:
             self.robot.arm_control(final_pose)
 
 

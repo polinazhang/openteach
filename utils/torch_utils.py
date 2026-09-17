@@ -12,8 +12,8 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-import torch
 import numpy as np
+import torch
 
 
 def to_torch(x, dtype=torch.float, device='cuda:0', requires_grad=False):
@@ -214,14 +214,6 @@ def rotate_vec_by_axisangle(vec, aa_vec):
         aa_v * (torch.sum(aa_v * vec, dim=-1, keepdim=True)) * (1 - c)
 
     return vec_rot
-
-
-@torch.jit.script
-def quat_conjugate(q):
-    input_shape = q.shape
-    q = (-q).reshape(-1, input_shape[-1])
-    q[:, 3] = -q[:, 3]
-    return q.reshape(list(input_shape))
 
 
 @torch.jit.script

@@ -1,8 +1,11 @@
-import hydra
-from openteach.components import RealsenseCameras
 import time
+
+import hydra
+
 # https://github.com/IntelRealSense/librealsense/issues/6628#issuecomment-646558144
 import pyrealsense2 as rs
+
+from openteach.components import RealsenseCameras
 
 # initiating hardware reset
 ctx = rs.context()
@@ -13,7 +16,7 @@ for dev in devices:
     dev.hardware_reset()
     print(" done")
 
-import time; time.sleep(2)
+time.sleep(2)
 
 
 @hydra.main(version_base = '1.2', config_path = 'configs', config_name = 'camera')

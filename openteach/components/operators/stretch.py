@@ -1,24 +1,22 @@
+from copy import deepcopy as copy
+
 import numpy as np
-import matplotlib.pyplot as plt
+import torch
 import zmq
 
-from mpl_toolkits.mplot3d import Axes3D
-from tqdm import tqdm
-
-from copy import deepcopy as copy
-from openteach.constants import *
-from openteach.utils.timer import FrequencyTimer
-from openteach.utils.network import ZMQKeypointSubscriber
-from openteach.utils.vectorops import *
-from openteach.utils.files import *
 #from openteach.robot.stretch import Stretch
 from scipy.spatial.transform import Rotation, Slerp
-from .operator import Operator
+
+from openteach.components.operators.operator_base import Operator
+from openteach.constants import *
+from openteach.utils.files import *
+from openteach.utils.network import ZMQKeypointSubscriber
+
 #from stretch_visual_servoing.normalized_velocity_control import NormalizedVelocityControl
 from openteach.utils.publisher import ImitiationPolicyPublisher
 from openteach.utils.subscriber import ImagePolicySubscriber
-import torch
-
+from openteach.utils.timer import FrequencyTimer
+from openteach.utils.vectorops import *
 
 np.set_printoptions(precision=2, suppress=True)
 # Filter to smooth out the arm cartesian state
@@ -110,7 +108,7 @@ class StretchOperator(Operator):
     def _get_hand_frame(self):
         for i in range(10):
             data = self.transformed_arm_keypoint_subscriber.recv_keypoints(flags=zmq.NOBLOCK)
-            if not data is None: break
+            if data is not None: break
         if data is None: return None
         return np.asanyarray(data).reshape(4, 3)
 

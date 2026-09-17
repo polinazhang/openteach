@@ -1,10 +1,11 @@
-import zmq
-import cv2
-import base64
-import numpy as np
 import pickle
-import blosc as bl
 import threading
+
+import blosc as bl
+import cv2
+import numpy as np
+import zmq
+
 
 # ZMQ Sockets
 def create_push_socket(host, port):
@@ -105,10 +106,13 @@ class ZMQCameraPublisher(object):
         self.socket.send(b"intrinsics " + pickle.dumps(array, protocol = -1))
 
     def pub_rgb_image(self, rgb_image, timestamp):
-        _, buffer = cv2.imencode('.jpg', rgb_image, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+        success, buffer = cv2.imencode('.png', rgb_image, [int(cv2.IMWRITE_PNG_COMPRESSION), 3])
+        if not success:
+            raise ValueError('Failed to encode RGB frame as PNG.')
+
         data = dict(
             timestamp = timestamp,
-            rgb_image = base64.b64encode(buffer)
+            rgb_image = buffer.tobytes()
         )
         self.socket.send(b"rgb_image " + pickle.dumps(data, protocol = -1))
 
@@ -151,10 +155,9 @@ class ZMQCameraSubscriber(threading.Thread):
 
     def recv_rgb_image(self):
         raw_data = self.socket.recv()
-        data = raw_data.lstrip(b"rgb_image ")
-        data = pickle.loads(data)
-        encoded_data = np.fromstring(base64.b64decode(data['rgb_image']), np.uint8)
-        return cv2.imdecode(encoded_data, 1), data['timestamp']
+        data = pickle.loads(raw_data[len(b"rgb_image "):])
+        encoded_data = np.frombuffer(data['rgb_image'], np.uint8)
+        return cv2.imdecode(encoded_data, cv2.IMREAD_COLOR), data['timestamp']
 
     def recv_depth_image(self):
         raw_data = self.socket.recv()

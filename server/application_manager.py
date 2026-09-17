@@ -1,7 +1,7 @@
-import zmq
-import base64
-import numpy as np
 import pickle
+
+import zmq
+
 
 class VideoStreamer(object):
     def __init__(self, host, cam_port):
@@ -16,15 +16,13 @@ class VideoStreamer(object):
 
     def _get_image(self):
         raw_data = self.socket.recv()
-        data = raw_data.lstrip(b"rgb_image ")
-        data = pickle.loads(data)
-        encoded_data = np.fromstring(base64.b64decode(data['rgb_image']), np.uint8)
-        return encoded_data.tobytes()
+        data = pickle.loads(raw_data[len(b"rgb_image "):])
+        return data['rgb_image']
 
     def yield_frames(self):
         while True:
             yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + self._get_image() + b'\r\n')  # concat frame one by one and show result
+                   b'Content-Type: image/png\r\n\r\n' + self._get_image() + b'\r\n')  # concat frame one by one and show result
 
 
 class MonitoringApplication(object):

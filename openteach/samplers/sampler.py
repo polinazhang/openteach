@@ -1,10 +1,13 @@
 import os
+from abc import ABC, abstractmethod
+
 import cv2
 import h5py
 import numpy as np
-from abc import ABC, abstractmethod
-from openteach.utils.files import get_pickle_data
+
 from openteach.constants import *
+from openteach.utils.files import get_pickle_data
+
 
 class Sampler(ABC):
     def __init__(self, data_path, cam_idxs, data_type, min_action_distance):
@@ -166,7 +169,7 @@ class Sampler(ABC):
             )
             writer = cv2.VideoWriter(
                 store_path,
-                cv2.VideoWriter_fourcc(*'XVID'),
+                cv2.VideoWriter_fourcc(*'FFV1'),
                 SAMPLE_WRITER_FPS,
                 IMAGE_RECORD_RESOLUTION
             )
@@ -175,7 +178,7 @@ class Sampler(ABC):
             print('Writing the frames.')
             while capture.isOpened():
                 ret, frame = capture.read()
-                if ret == True:
+                if ret:
                     if counter in self._chosen_frame_idxs['rgb'][cam_idx]:
                         writer.write(frame)
                         num_frames_recorded += 1

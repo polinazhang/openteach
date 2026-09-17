@@ -1,13 +1,12 @@
-import hydra
-import numpy as np
 import pickle
 
-from multiprocessing import Process
+import hydra
 
 from openteach.components import Component
+from openteach.constants import DEPLOY_FREQ
 from openteach.utils.network import create_response_socket
 from openteach.utils.timer import FrequencyTimer
-from openteach.constants import DEPLOY_FREQ, VR_FREQ
+
 
 class DeployServer(Component):
     def __init__(self, configs):

@@ -1,9 +1,10 @@
-import cv2
-import time
-import zmq
 import pickle
+import time
+
+import cv2
 import numpy as np
-import base64
+import zmq
+
 
 class FrequencyTimer(object):
     def __init__(self, frequency_rate):
@@ -48,10 +49,10 @@ class SocketChecker(object):
         print(pickle.loads(processed_data))
 
     def _decode_rgb_image(self):
-        frame = self.data.lstrip(b"rgb_image ")
-        encoded_data = np.fromstring(base64.b64decode(frame), np.uint8)
-        image = cv2.imdecode(encoded_data, 1)
-        cv2.imshow(image)
+        frame = pickle.loads(self.data[len(b"rgb_image "):])
+        encoded_data = np.frombuffer(frame['rgb_image'], np.uint8)
+        image = cv2.imdecode(encoded_data, cv2.IMREAD_COLOR)
+        cv2.imshow('rgb_image', image)
         cv2.waitKey(1)
 
     def check_connection(self):
