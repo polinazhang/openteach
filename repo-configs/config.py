@@ -7,3 +7,5 @@ repo_root = str(Path(__file__).resolve().parents[2])
 
 # Recording and processed demonstration storage.
 data_root = "/data3/extracted_data"
+
+openpi_root = "/home/ripl/openpi"

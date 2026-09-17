@@ -9,3 +9,5 @@ _spec.loader.exec_module(_config)
 repo_root = _config.repo_root
 
 data_root = _config.data_root
+
+openpi_root = _config.openpi_root

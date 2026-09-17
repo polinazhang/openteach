@@ -1,0 +1,226 @@
+Franka action-target investigation — 2026-09-16
+
+DOWNSTREAM EVALUATION CONTRACT
+Scope: Cartesian-tag Franka checkpoints trained with the inspected trainer config.
+This contract does NOT describe the older joint-tag checkpoints in the same root.
+Direct data checks covered franka-30; see verification coverage limitations below.
+
+Training is consistent with ABSOLUTE CARTESIAN POSE prediction. It is NOT training
+for delta Cartesian prediction. Converting JAX weights to Torch preserves this.
+
+Physical action layout, AFTER unnormalization (zero-based indices):
+  0: target x
+  1: target y
+  2: target z
+  3: target quaternion x
+  4: target quaternion y
+  5: target quaternion z
+  6: target quaternion w
+  7: binary gripper command, training values -1 and +1
+XYZ and orientation specify the absolute commanded end-effector pose in the
+recorder robot interface's pose frame, using its position units. They are not
+offsets from current state, chunk-start state, or the preceding action. Rotation
+is a quaternion in xyzw order, not wxyz, Euler angles, axis-angle, or a quaternion
+increment. Quaternions q and -q represent the same orientation.
+Coordinates 8 through 31 are model padding, NOT additional robot commands.
+Gripper is a command, not the measured gripper_pos input and not a Cartesian delta.
+
+Output boundary and scaling:
+  - Raw model sample_actions output has 50 time steps and 32 coordinates per step
+    (plus a batch dimension where applicable). The first eight are normalized.
+  - For raw normalized coordinate z_i, recover the stored action with:
+      a_i = (z_i + 1) / 2 * (q99_i - q01_i + 1e-6) + q01_i
+    using actions statistics from that checkpoint's assets/franka/norm_stats.json.
+  - Do not substitute dataset statistics or recompute normalization at evaluation.
+  - OpenPI create_trained_policy with the Cartesian training config already applies
+    Unnormalize in its output transforms. Do NOT unnormalize those outputs again.
+    The inspected Cartesian config has no output slice transform, so this standard
+    policy path retains the padded width unless the caller supplies another output
+    transform. Inspect the wrapper boundary and consume only the first eight.
+  - Predicted values are continuous. Binary training gripper values and unit
+    training quaternions do not guarantee exactly binary/unit model predictions.
+    Gripper discretization and quaternion normalization/invalid-value handling
+    belong to the evaluation adapter and must be explicitly recorded.
+
+Temporal meaning:
+  - Each predicted chunk contains targets for t, t+0.05, ..., t+2.45 seconds:
+    50 action slots sampled from 20 Hz training data.
+  - Every slot is an absolute pose target; do NOT cumulatively sum the slots.
+  - Chunk length does not prescribe executing all 50 slots open-loop. Record the
+    actual execution horizon, replanning interval, and control rate for comparison.
+
+Input contract for the same training configuration:
+  - observation.state is eight values: seven measured joint positions followed by
+    measured gripper_pos, in the dataset's original conventions. Do NOT replace
+    these with XYZ/quaternion or command values. Apply the checkpoint state stats
+    and model preprocessing once, as the standard policy wrapper does.
+  - Camera mapping: camera_front -> base_0_rgb;
+                    camera_wrist -> left_wrist_0_rgb;
+                    camera_side -> right_wrist_0_rgb.
+    All three were enabled. FrankaInputs expects observation.images.<camera> keys.
+  - Provide the task prompt; use the training image resize/tokenization pipeline.
+  - Model architecture: Pi0.5, action_dim=32, action_horizon=50, max_token_len=200.
+    Select tag='cartesian' explicitly; the trainer factory defaults to 'joint'.
+
+Environment/controller compatibility:
+  - An environment accepting absolute poses must receive the decoded pose in its
+    matching frame, units, quaternion convention, and tool frame.
+  - An environment accepting deltas must first convert the absolute target against
+    the CURRENT measured end-effector pose using that controller's convention.
+    Do NOT send these eight absolute values directly to a delta-action interface.
+    Do NOT subtract joint observation.state from Cartesian coordinates.
+  - The inspected recorder forms translation error and relative-rotation
+    axis-angle error, then clips them before sending a six-dimensional arm_action
+    to OSC_POSE. Gripper is sent separately. Its source constants are translation
+    limit 0.1 and per-axis rotation limit 0.5; these are recorder implementation
+    facts, not a verified specification of a different evaluation controller.
+
+Unresolved adapter conventions (do not silently guess):
+  - The exact evaluation world's alignment and tool/TCP transform to the recorder
+    robot-interface frame, and explicit confirmation of position units.
+  - Whether -1 or +1 means open/closed in the evaluation gripper driver, and the
+    threshold/mapping for continuous model predictions. The training dataset
+    proves the two labels, not a freshly verified driver endpoint mapping.
+  - Evaluation controller delta frame, rotation composition, action scaling,
+    clipping, and timing. These are not specified by the model architecture.
+The model's action representation is specified above; these environment-specific
+conventions must be matched and documented before claiming comparable closed-loop
+evaluation. This log does not establish policy quality or successful rollouts.
+
+CONCLUSION
+The inspected Cartesian training configuration learns the stored eight-dimensional
+Cartesian commands, after normalization. It does not construct Cartesian deltas.
+The inspected data and recorder evidence indicate ABSOLUTE Cartesian pose targets,
+not the delta controller actions described in the request.
+The configuration's absolute_cartesian_xyz_quaternion_xyzw metadata agrees with
+this evidence. My earlier suggestion to relabel it as delta was premature.
+
+If the dataset really contained deltas, passing them through would preserve those
+deltas. That conditional statement is correct, but is not evidence that this
+dataset contains them. The source recorder distinguishes two different fields.
+
+STORED FORMAT AND SOURCE EVIDENCE
+Root: /coc/testnvme/xzhang3205/franka-datasets/franka-30
+All five meta/info.json files specify float32 action[8]:
+  [x, y, z, quat_x, quat_y, quat_z, quat_w, gripper]
+State is [joint1, joint2, joint3, joint4, joint5, joint6, joint7, gripper_pos].
+The dataset FPS is 20. All scanned actions are finite; gripper values are exactly
+-1 and +1. Quaternion norms are approximately one (within 4.2e-8 in this scan).
+No conversion to Euler angles, axis-angle, or quaternion deltas occurs in training.
+
+Task       Frames   Min X       Max X       First-episode-end index
+10          8322    0.449742    0.747743     377
+13          6515    0.428619    0.517774     254
+14          6440    0.424393    0.535055     237
+16          7429    0.399052    0.502617     313
+2          10440    0.452683    0.730495     435
+Total: 39,146 frames, 150 episodes. Ranges alone are suggestive, not proof of
+absolute versus relative coordinates.
+
+Recorder source:
+/coc/testnvme/xzhang3205/reference/openteach/openteach/components/operators/franka.py
+arm_control(), lines 433-484:
+  - interprets cartesian_pose as target position and quaternion;
+  - compares that target pose against the current measured end-effector pose;
+  - computes translation error and quaternion-relative axis-angle error;
+  - clips those errors and stores them separately as arm_action (six dimensions);
+  - stores the original target pose as cartesian_pose_cmd (seven dimensions);
+  - records gripper_action separately and sends arm_action to the controller.
+Thus controller delta commands and stored Cartesian pose commands are distinct.
+
+Direct source comparison example (fresh read, not inferred from field names):
+Dataset normal_task10_30, episode 0, frame 0:
+  action = [0.45712343, 0.03203877, 0.26471701,
+            0.99985975, 0.00930237, 0.01376699, 0.00210976, -1]
+Source: /coc/pskynet4/triage/h5_files/demo_triage_medium_10__1.h5
+  source arm_action at this frame = [0, 0, 0, 0, 0, 0]
+  Dataset episode XYZ matches source cartesian_pose_cmd exactly at float32;
+  quaternion matches up to quaternion sign; gripper and measured joints match.
+The nonzero dataset target pose is plainly different from the zero controller
+delta at the same frame.
+
+Supporting provenance code/documents:
+/coc/testnvme/xzhang3205/vla-adaptation/static-inference/design/convert_cartesian_to_joint.py
+  match_reference(), lines 89-107, explicitly matches dataset actions to source
+  cartesian_pose_cmd, not arm_action.
+/coc/testnvme/xzhang3205/vla-adaptation/static-inference/design/franka_changes/record_full.md
+  documents cartesian_pose_cmd as absolute XYZ + quaternion xyzw and its direct
+  concatenation with gripper_action for the Cartesian dataset.
+
+TRAINING PATH
+Trainer root: /coc/testnvme/xzhang3205/vla-adaptation/trainer-franka
+train.py passes --tag through to franka_config.make_config(). Cartesian submission
+and resume manifests explicitly pass --tag cartesian and the franka-30 paths.
+The default tag is joint, so using the default would NOT select this data behavior.
+
+franka_config.py:
+  FrankaInputs copies action to actions and observation.state to state.
+  FrankaDataConfig.create adds DeltaActions ONLY when tag == joint.
+  For tag == cartesian it adds no subtraction, FK, relative-rotation operation,
+  temporal differencing, or controller scaling/clipping.
+  It loads fixed base assets/franka/norm_stats.json; no recomputation.
+  Pi0Config(pi05=True, action_dim=32, action_horizon=50, max_token_len=200).
+  policy_metadata labels Cartesian actions absolute_cartesian_xyz_quaternion_xyzw.
+
+OpenPI root: /coc/testnvme/xzhang3205/vla-adaptation/models/openpi
+src/openpi/training/data_loader.py, create_torch_dataset()/transform_dataset():
+  action chunks use offsets [0/20, 1/20, ..., 49/20] seconds.
+  Processing order: repack -> Franka inputs -> normalization -> model transforms.
+src/openpi/training/config.py, DataConfigFactory/ModelTransformFactory:
+  Pi0.5 uses quantile normalization, image resizing, prompt/state tokenization,
+  and state/action padding.
+src/openpi/transforms.py, Normalize/PadStatesAndActions:
+  normalized action = 2 * (stored action - q01) / (q99 - q01 + 1e-6) - 1.
+  No clipping is performed by this normalization.
+  Eight normalized action coordinates are padded with 24 zeros.
+  Training target shape per example is (50, 32).
+scripts/train.py and src/openpi/models/pi0.py:
+  These processed actions feed the flow-matching loss directly; the loss does not
+  reinterpret them as Cartesian deltas. Metadata does not change the loss targets.
+
+Consequently sampled model actions are in normalized coordinates; recovering the
+stored physical command representation requires the matching unnormalization and
+the first eight coordinates. The configuration does not add a Cartesian delta
+reference or integrate deltas. The last coordinate remains the dataset's binary
+gripper target after unnormalization. Open/closed sign semantics were not freshly
+verified in the gripper driver and are not inferred here.
+
+EXECUTED VERIFICATION
+1. Read action schema and every numeric action row across all five franka-30 tasks.
+   PASS: common eight-value layout, all finite, binary gripper, unit quaternions.
+2. Ran existing trainer verify.py --tag cartesian --demos 30 on CPU.
+   Initial run failed because HF_DATASETS_CACHE pointed to a read-only directory.
+   Reran with HF_DATASETS_CACHE=/tmp/franka-investigation-datasets,
+   JAX_PLATFORMS=cpu, HF_HUB_OFFLINE=1, from /tmp, using OpenPI .venv/bin/python.
+   PASS, exit code 0, all five datasets, indices [0, first episode end, last frame].
+   Checks include native/adapted loader equivalence, unchanged Cartesian actions,
+   unchanged state/gripper, exact configured base stats, independently calculated
+   normalized targets, (50,32) shape, zero padding, camera mapping, prompts, and
+   episode-end padding. Report: /tmp/verification_cartesian_30.json.
+   This is a sampled transform test, not an all-frame training run.
+3. Fresh H5 provenance comparison used episode-to-source mappings from
+   static-inference/design/franka30_smooth_30.json, then directly read the H5 and
+   current Parquet arrays rather than trusting the old report's conclusions.
+   PASS for task10 episode 0 (378 frames): exact float32 XYZ, quaternion sign
+   equivalence, exact gripper commands and recorded joints. The printed first
+   frame also distinguishes absolute pose from the zero arm_action above.
+   The broader 150-episode comparison stopped producing progress after this
+   episode and was interrupted (exit 130). Full-source coverage is NOT claimed.
+4. An additional check of 10-demo action-prefix equality and checkpoint asset
+   equality also stopped producing progress and was interrupted (exit 130)
+   without results. Neither check is claimed as passed. The completed direct
+   data/transform checks in this investigation cover franka-30; the trainer's
+   subset_cartesian.py documents unchanged action copying for franka-10, but
+   current 10-demo contents were not freshly verified here.
+
+IMPLICATION FOR CONFIG REUSE
+The training model configuration describes the architecture required to convert
+these weights. Reusing that architecture preserves their existing learned target
+representation; conversion cannot change absolute-action training into delta-
+action training. No evidence here justifies changing the metadata to delta.
+This investigation establishes targets and preprocessing, not prediction accuracy;
+no checkpoint inference or retraining was performed.
+
+Only this investigation log is being added to the workspace. No training config,
+dataset, conversion script, or weights were changed. No Slurm queries/submissions,
+Hugging Face operations, or credential reads were made.
