@@ -84,8 +84,8 @@ def get_demo_number(filename):
     return demo_name[5:] if demo_name.startswith("demo_") else demo_name
 
 
-def check_nuc_hash_and_diff():
-    """This is to ensure there are no changes on the NUC that would affect playback."""
+def check_nuc_hash():
+    """Verify the expected NUC commit, allowing local and untracked changes."""
     s = time.time()
     with open(os.path.join(CONFIG_ROOT, "deoxys.yml"), "r") as f:
         deoxys_cfg = EasyDict(yaml.safe_load(f))
@@ -103,15 +103,7 @@ def check_nuc_hash_and_diff():
             allow_agent=True,
             look_for_keys=True,
         )
-        status_cmd = f"cd {repo_path} && git status --porcelain"
         hash_cmd = f"cd {repo_path} && git rev-parse HEAD"
-        _, status_stdout, status_stderr = client.exec_command(status_cmd, timeout=5)
-        status_output = status_stdout.read().decode("utf-8", errors="replace").strip()
-        status_error = status_stderr.read().decode("utf-8", errors="replace").strip()
-        if status_error:
-            raise RuntimeError(f"Failed to check git status on NUC: {status_error}")
-        if status_output:
-            raise RuntimeError("NUC deoxys_control has uncommitted changes.")
         _, hash_stdout, hash_stderr = client.exec_command(hash_cmd, timeout=5)
         current_hash = hash_stdout.read().decode("utf-8", errors="replace").strip()
         hash_error = hash_stderr.read().decode("utf-8", errors="replace").strip()
@@ -123,7 +115,7 @@ def check_nuc_hash_and_diff():
             )
     finally:
         client.close()
-    print("NUC deoxys_control repository is clean and matches expected hash.")
+    print("NUC deoxys_control repository matches expected hash.")
     print(f"NUC check took {time.time() - s:.2f} seconds.")
 
 
@@ -140,7 +132,7 @@ def replay_from_h5(args):
     with open(os.path.join(CONFIG_ROOT, "network.yaml"), "r") as f:
         network_cfg = EasyDict(yaml.safe_load(f))
 
-    check_nuc_hash_and_diff()
+    check_nuc_hash()
 
     with h5py.File(filename, "r") as h5f:
         arm_action = h5f["arm_action"][:]
