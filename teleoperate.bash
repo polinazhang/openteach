@@ -1,8 +1,6 @@
 #!/bin/bash
 NUC_IP=${1:-172.16.0.3}
-PYTHON_BIN=/home/jeremiah/miniforge3/envs/openteach/bin/python
-OPENTEACH_DIR=/home/ripl/openteach
-DEOXYS_EXAMPLES_DIR=/home/ripl/deoxys_control/deoxys/examples
+source "$(dirname -- "${BASH_SOURCE[0]}")/repo-configs/paths.bash" || exit 1
 # Start Terminator
 terminator &
 
@@ -41,7 +39,7 @@ sleep 0.25
 xdotool key Return
 sleep 0.25
 
-# xdotool type '/home/jeremiah/miniforge3/envs/openteach/bin/roslaunch franka_arm franka_arm.launch'
+# xdotool type 'roslaunch franka_arm franka_arm.launch'
 # sleep 0.25
 # xdotool key Return
 # sleep 0.25
@@ -120,7 +118,7 @@ xdotool type "cd $OPENTEACH_DIR"
 sleep 0.25
 xdotool key Return
 sleep 0.25
-xdotool type "$PYTHON_BIN /home/ripl/deoxys_control/deoxys/auto_scripts/read_franka_errors.py"
+xdotool type "\"$PYTHON_BIN\" \"$FRANKA_DIR/deoxys/auto_scripts/read_franka_errors.py\""
 sleep 0.25
 xdotool key Return
 

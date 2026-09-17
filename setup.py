@@ -1,7 +1,8 @@
 import os
+import sys
 from pathlib import Path
 
-from setuptools import find_packages, setup
+from setuptools import find_namespace_packages, setup
 
 try:
     from pybind11.setup_helpers import Pybind11Extension, build_ext
@@ -18,8 +19,7 @@ ROOT = Path(__file__).parent.resolve()
 def eigen_include_dirs():
     candidates = [
         os.environ.get("EIGEN3_INCLUDE_DIR"),
-        "/usr/include/eigen3",
-        "/usr/local/include/eigen3",
+        str(Path(sys.prefix) / "include" / "eigen3"),
         str(ROOT / "third_party" / "eigen"),
     ]
     return [path for path in candidates if path and Path(path).exists()]
@@ -45,7 +45,7 @@ ext_modules = [
 setup(
     name="open-teach",
     version="1.0.0",
-    packages=find_packages(),
+    packages=find_namespace_packages(include=["openteach", "openteach.*"]),
     description="Open-Teach:VR Teleoperation for Robotic Manipulation",
     install_requires=["numpy"],
     ext_modules=ext_modules,

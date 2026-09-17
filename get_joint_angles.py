@@ -1,3 +1,5 @@
+from openteach.repo_config import repo_root
+
 import argparse
 import os
 import time
@@ -6,8 +8,8 @@ import numpy as np
 from deoxys.franka_interface import FrankaInterface
 
 DEFAULT_CONFIG = os.path.join(
-    os.path.expanduser("~"),
-    "deoxys_control/deoxys/config/charmander.yml",
+    repo_root,
+    "franka-control/deoxys/config/charmander.yml",
 )
 
 

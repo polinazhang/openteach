@@ -20,7 +20,7 @@
 
       If you are running Ubuntu 20.04, which does not have a libpython3.7 package, you will instead need to set the LD_LIBRARY_PATH variable appropriately:
 
-      `export LD_LIBRARY_PATH=/home/xyz/miniforge3/envs/openteach_isaac/lib`
+      `export LD_LIBRARY_PATH=${CONDA_PREFIX}/lib`
 
    2. If you see an error like this
 
@@ -36,11 +36,11 @@
 
    4. Export Library path to avoid errors related to cublas (Required)
 
-      1. `export LD_LIBRARY_PATH='/home/xyz/miniforge3/envs/openteach_isaac/lib/python3.7/site-packages/nvidia/cublas/lib/':$LD_LIBRARY_PATH`
+      1. `export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib/python3.7/site-packages/nvidia/cublas/lib/":$LD_LIBRARY_PATH`
 
    5. Export library path to avoid errors. (Required)
 
-      1. `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:'/home/xyz/miniforge3/envs/openteach_isaac/lib'`
+      1. `export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${CONDA_PREFIX}/lib"`
 
 3. After fixing the above errors and paths related to IsaacGym.
 

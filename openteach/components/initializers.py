@@ -177,6 +177,7 @@ class Collector(ProcessInstantiator):
         super().__init__(configs)
         self.demo_num = demo_num
         self._storage_path = os.path.join(
+            repo_root, "openteach",
             self.configs.storage_path,
             'demonstration_{}'.format(self.demo_num)
         )
@@ -357,5 +358,4 @@ class Collector(ProcessInstantiator):
                     target = self._start_robot_component,
                     args = (robot_controller_configs, key, )
                 ))
-
 

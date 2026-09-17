@@ -1,11 +1,9 @@
 # view_realsense.py
 import argparse
-import sys
 
 import cv2
 
-sys.path.append("/home/ripl/openteach/openteach/utils")
-from network import ZMQCameraSubscriber
+from openteach.utils.network import ZMQCameraSubscriber
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--host", default="172.16.0.1")

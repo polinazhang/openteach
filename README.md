@@ -37,21 +37,20 @@ This repo consists of two parts:
 
 
 ## Code Installation
-Install [Deoxys Control](https://github.com/UT-Austin-RPL/deoxys_control).
+Keep `openteach` and `franka-control` as sibling checkouts under `repo_root`.
+`repo-configs/config.py` derives that parent from its own location.
 
-Clone this repository and enable pre-commit hooks:
+From this checkout, install the tested Franka environment and both local packages:
 ```bash
-GIT_LFS_SKIP_SMUDGE=1 git clone git@github.com:jmcoholich/openteach.git
-git config core.hooksPath .githooks
+bash repo-configs/install.bash
+conda activate ./.conda-env
 ```
 
-Create the conda environment:
-```bash
-conda env create -f environment.yml
-```
-(We highly recommend using [mamba](https://github.com/mamba-org/mamba) instead of conda for faster environment creation.)
-
-This code has only been tested on Ubuntu 20.04
+The installer builds GeoFIK, generates Deoxys protobuf bindings, and runs offline
+checks. See [local setup and dependencies](repo-configs/README.md) for relocation,
+remote controller prerequisites, and integrations outside this environment.
+The old root `environment.yml` is retained only as an untested upstream reference;
+use `repo-configs/environment.yml` through the installer above.
 
 <!-- This is the official implementation of the Open Teach including unity scripts for the VR application, teleoperation pipeline and demonstration collection pipeline.
 
@@ -99,49 +98,53 @@ The script `teleoperate.bash` uses [xdotool](https://github.com/jordansissel/xdo
 bash teleoperate.bash <NUC_IP_ADDR>
 ```
 ### To start teleoperation step-by-step:
-Run this on the NUC:
+Run this on the NUC after loading `repo_root` from its `franka-control/repo-configs/config.py`:
 
 ```bash
-cd deoxys_control/deoxys && ./auto_scripts/auto_arm.sh config/charmander.yml
+cd "$repo_root/franka-control/deoxys" && ./auto_scripts/auto_arm.sh config/charmander.yml
 ```
 
 In another NUC terminal run:
 ```bash
-cd deoxys_control/deoxys && ./auto_scripts/auto_gripper.sh config/charmander.yml
+cd "$repo_root/franka-control/deoxys" && ./auto_scripts/auto_gripper.sh config/charmander.yml
 ```
 
-#### On the main workstation, run each of the following sets of commands in a new terminal:
+#### On the main workstation, start each terminal in the openteach checkout:
 
 Reset the robot joints to a default position:
 ```bash
-conda activate openteach && cd ~/deoxys_control/deoxys/examples
+source repo-configs/paths.bash
+cd "$DEOXYS_EXAMPLES_DIR"
 python reset_robot_joints.py
 ```
 
 Start streaming the cameras:
 ```bash
-conda activate openteach && cd ~/openteach
+source repo-configs/paths.bash
+cd "$OPENTEACH_DIR"
 python robot_camera.py
 ```
 
 Start camera recordings:
 ```bash
-conda activate openteach && cd ~/openteach
+source repo-configs/paths.bash
+cd "$OPENTEACH_DIR"
 python data_collect.py robot=franka demo_num=<name for demo>
 ```
 
 Start robot teleoperation:
 ```bash
-conda activate openteach && cd ~/openteach
+source repo-configs/paths.bash
+cd "$OPENTEACH_DIR"
 python teleop.py robot=franka record=<SAME demo name as in previous command>
 ```
 
 To end teleop and save the recordings, simply kill the above two scripts. To reset the arm, run:
 
 ```bash
-cd ~/deoxys_control/deoxys/examples
+cd "$DEOXYS_EXAMPLES_DIR"
 python reset_robot_joints.py
-cd ~/openteach
+cd "$OPENTEACH_DIR"
 python reset_gripper.py
 ```
 ## Data files

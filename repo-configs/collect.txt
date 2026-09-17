@@ -1,0 +1,1 @@
+alias collect='bash "{repo_root}/openteach/teleoperate.bash"'

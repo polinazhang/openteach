@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+source "$(dirname -- "${BASH_SOURCE[0]}")/repo-configs/paths.bash" || exit 1
+cd -- "$OPENTEACH_DIR" || exit 1
 
 if [[ $# -ne 1 ]]; then
     echo "Usage: $0 <record_name>"
@@ -30,13 +32,13 @@ stop_children() {
 trap stop_children INT
 
 echo "Starting data_collect.py..."
-bash -c 'exec /home/jeremiah/miniforge3/envs/openteach/bin/python "$@"' bash data_collect.py robot=franka demo_num="${RECORD_NAME}" &
+"$PYTHON_BIN" data_collect.py robot=franka demo_num="${RECORD_NAME}" &
 DATA_PID=$!
 
 sleep 0.2
 
 echo "Starting teleop.py..."
-bash -c 'exec /home/jeremiah/miniforge3/envs/openteach/bin/python "$@"' bash teleop.py robot=franka control-mode=absolute_eef_pose_to_delta record="${RECORD_NAME}" &
+"$PYTHON_BIN" teleop.py robot=franka control-mode=absolute_eef_pose_to_delta record="${RECORD_NAME}" &
 TELEOP_PID=$!
 
 echo "Started:"

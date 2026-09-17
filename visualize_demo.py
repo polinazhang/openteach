@@ -6,6 +6,8 @@ Outputs
 - An .h5 file containing processed data
 """
 
+from openteach.repo_config import repo_root
+
 import os
 import pickle as pkl
 import shutil
@@ -49,7 +51,7 @@ def main():
             make_combined_video(None, demo_number.strip(), make_video=not args.no_video, video_only=args.video_only)
 
     elif args.demo_folder:
-        data_root = f"{os.path.expanduser('~')}/openteach/extracted_data/{args.demo_folder}"
+        data_root = f"{repo_root}/openteach/extracted_data/{args.demo_folder}"
         if not os.path.exists(data_root):
             raise FileNotFoundError(f"Folder {data_root} does not exist. Please check the folder name and try again.")
         for file in os.listdir(data_root):
@@ -67,7 +69,7 @@ def main():
 
 
 def make_combined_video(folder, demo_number, make_video=True, video_only=False):
-    root_folder = f"{os.path.expanduser('~')}/openteach/extracted_data"
+    root_folder = f"{repo_root}/openteach/extracted_data"
     if folder is None and demo_number.endswith(".h5"):
         demo_path = os.path.dirname(demo_number) or "."
         demo_number = os.path.basename(demo_number)[:-3]
@@ -580,7 +582,7 @@ def q_conjugate(q):
 
 
 def make_depth_videos(demo_number):
-    demo_path = os.path.join(os.path.expanduser("~"), f"openteach/extracted_data/demonstration_{demo_number}")
+    demo_path = os.path.join(repo_root, f"openteach/extracted_data/demonstration_{demo_number}")
     frames_dir = f"{demo_path}/frames"
     for j in [0, 1, 2]:
         with h5py.File(f"{demo_path}/cam_{j}_depth.h5", "r") as f:

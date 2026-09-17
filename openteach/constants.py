@@ -1,4 +1,5 @@
 import os.path as path
+from openteach.repo_config import repo_root
 
 # VR detector
 # Arm movement
@@ -82,7 +83,7 @@ VIZ_PORT_OFFSET = 500
 DEPTH_PORT_OFFSET = 1000
 
 # Calibration file paths
-CALIBRATION_FILES_PATH = 'calibration_files'
+CALIBRATION_FILES_PATH = path.join(repo_root, 'openteach', 'calibration_files')
 VR_THUMB_BOUNDS_PATH = path.join(CALIBRATION_FILES_PATH, 'vr_thumb_bounds.npy')
 VR_DISPLAY_THUMB_BOUNDS_PATH = path.join(CALIBRATION_FILES_PATH, 'vr_thumb_plot_bounds.npy')
 VR_2D_PLOT_SAVE_PATH = path.join(CALIBRATION_FILES_PATH, 'oculus_hand_2d_plot.jpg')
@@ -124,4 +125,3 @@ BIMANUAL_RIGHT_HOME = [206,0,475,3.142,0,0]
 ROBOT_HOME_POSE_AA = [206.0, -0.0, 475, 3.142, 0.0, 0.0]
 ROBOT_HOME_JS = [0.072358, -0.95536, -0.040176,
                  0.661511, -0.032836, 1.616466, 0.047656]
-

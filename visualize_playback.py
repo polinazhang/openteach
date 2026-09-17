@@ -6,6 +6,8 @@ Outputs
 - An .h5 file containing processed data
 """
 
+from openteach.repo_config import repo_root
+
 import os
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 
@@ -53,7 +55,7 @@ def load_data(h5_path):
 
 
 def make_replay_video(args):
-    root_folder = f"{os.path.expanduser('~')}/openteach/extracted_data"
+    root_folder = f"{repo_root}/openteach/extracted_data"
 
     orig_path = os.path.join(root_folder, f"demonstration_{args.demo_num}/demo_{args.demo_num}.h5")
     suffix = f"_{args.suffix}" if args.suffix else ""
@@ -272,7 +274,7 @@ def make_replay_joint_plots(angles, gripper_pos, replay_angles, replay_gripper_p
 
 def compile_video(vid_name, frames_dir, results_dir):
     command = f"yes | ffmpeg -framerate 40 -i {frames_dir}/frame_%03d.png -c:v libx264 -pix_fmt yuv420p {results_dir}/{vid_name}.mp4"
-    run_cmd(command, env={'LD_PRELOAD': '/usr/lib/x86_64-linux-gnu/libffi.so.7'})
+    run_cmd(command)
 
 
 if __name__ == "__main__":

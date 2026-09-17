@@ -11,12 +11,10 @@
 #SBATCH -x irona,calculon
 set -euox pipefail
 
-source /coc/testnvme/$USER/.bashrc
-conda activate lerobot
-export PATH="$CONDA_PREFIX/bin:$PATH"
+source "${SLURM_SUBMIT_DIR:-$(dirname -- "${BASH_SOURCE[0]}")}/repo-configs/paths.bash"
 unset LD_PRELOAD
 which ffmpeg
-cd ~/openteach
+cd -- "$OPENTEACH_DIR"
 
 echo "Running demo unthread4_${SLURM_ARRAY_TASK_ID}"
-python visualize_demo.py --demo_num /coc/testnvme/jcoholich3/openteach/extracted_data/unthread4/demonstration_unthread4_${SLURM_ARRAY_TASK_ID}
+"$PYTHON_BIN" visualize_demo.py --demo_num "$repo_root/openteach/extracted_data/unthread4/demonstration_unthread4_${SLURM_ARRAY_TASK_ID}"

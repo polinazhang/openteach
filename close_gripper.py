@@ -1,3 +1,5 @@
+from openteach.repo_config import repo_root
+
 import os
 import time
 
@@ -6,7 +8,7 @@ from deoxys.franka_interface import FrankaInterface
 
 def main():
     robot_interface = FrankaInterface(
-        os.path.join(os.path.expanduser("~"), "deoxys_control/deoxys/config/charmander.yml"),
+        os.path.join(repo_root, "franka-control/deoxys/config/charmander.yml"),
         use_visualizer=False,
     )
 

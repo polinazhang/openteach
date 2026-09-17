@@ -1,6 +1,8 @@
 # VS Code config
 .vscode
 .codex
+.conda-env/
+build/
 
 # Package Installation
 holo_bot.egg-info
