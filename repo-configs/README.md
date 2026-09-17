@@ -22,3 +22,8 @@ local package origins, Franka Hydra targets, GeoFIK forward/inverse kinematics,
 protobuf round trips, entry points from another working directory, and synthetic
 FFmpeg encoding. It does not open cameras, connect to the NUC, or move the robot.
 RealSense imports require access to the system udev monitor, even for these checks.
+Demonstration storage is set by the literal `data_root` in `config.py`.
+Recording, visualization, playback, splicing, and the Franka reset helper read
+that value. Relative `storage_path` and `storage_location` overrides are subfolders
+of `data_root`; absolute overrides still select an explicit location. Restart
+recording processes after changing the configuration.

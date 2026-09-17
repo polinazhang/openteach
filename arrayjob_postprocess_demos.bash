@@ -17,4 +17,4 @@ which ffmpeg
 cd -- "$OPENTEACH_DIR"
 
 echo "Running demo unthread4_${SLURM_ARRAY_TASK_ID}"
-"$PYTHON_BIN" visualize_demo.py --demo_num "$repo_root/openteach/extracted_data/unthread4/demonstration_unthread4_${SLURM_ARRAY_TASK_ID}"
+"$PYTHON_BIN" visualize_demo.py --demo_num "$data_root/unthread4/demonstration_unthread4_${SLURM_ARRAY_TASK_ID}"

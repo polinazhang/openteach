@@ -8,3 +8,4 @@ _config = module_from_spec(_spec)
 _spec.loader.exec_module(_config)
 repo_root = _config.repo_root
 
+data_root = _config.data_root

@@ -19,7 +19,7 @@ from openteach.utils.network import ZMQKeypointSubscriber
 from openteach.utils.timer import FrequencyTimer
 from openteach.utils.vectorops import *
 
-from openteach.repo_config import repo_root
+from openteach.repo_config import data_root, repo_root
 
 CONFIG_ROOT = os.path.join(repo_root, "openteach", "configs")
 
@@ -115,7 +115,7 @@ class FrankaArmOperator(Operator):
         arm_resolution_port = None,
         teleoperation_reset_port = None,
         record=None,
-        storage_location="extracted_data",
+        storage_location=".",
         control_mode=None,
         controller_cfg=None,
     ):
@@ -780,7 +780,7 @@ class FrankaArmOperator(Operator):
 
     def save_obs_cmd_history(self):
         demo_folder = f"demonstration_{self.record}"
-        demo_path = os.path.join(repo_root, "openteach", self.storage_location, demo_folder)
+        demo_path = os.path.join(data_root, self.storage_location, demo_folder)
         os.makedirs(demo_path, exist_ok=True)
         path = os.path.join(demo_path, f'deoxys_obs_cmd_history_{self.record}.h5')
         print('Saving the deoxys_obs_cmd_history to {}'.format(path))

@@ -21,8 +21,8 @@ def main():
     parser.add_argument("first_demo", help="Demo name, demonstration folder, or demo_*.h5 path.")
     parser.add_argument("second_demo", help="Demo name, demonstration folder, or demo_*.h5 path.")
     parser.add_argument("output_name", help="Name for the spliced output demo.")
-    from openteach.repo_config import repo_root
-    parser.add_argument("--data_root", type=Path, default=Path(repo_root) / "openteach" / "extracted_data")
+    from openteach.repo_config import data_root
+    parser.add_argument("--data_root", type=Path, default=Path(data_root))
     parser.add_argument("--trim_second_start_frames", type=int, default=0)
     parser.add_argument("--trim_first_end_frames", type=int, default=0)
     parser.add_argument("--overwrite", action="store_true")

@@ -18,3 +18,5 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
 fi
 export PATH="$OPENTEACH_DIR/.conda-env/bin:$PATH"
 unset _config_dir
+
+data_root="$("$PYTHON_BIN" -c 'from openteach.repo_config import data_root; print(data_root)')" || return 1

@@ -6,7 +6,7 @@ Outputs
 - An .h5 file containing processed data
 """
 
-from openteach.repo_config import repo_root
+from openteach.repo_config import data_root
 
 import os
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
@@ -55,7 +55,7 @@ def load_data(h5_path):
 
 
 def make_replay_video(args):
-    root_folder = f"{repo_root}/openteach/extracted_data"
+    root_folder = data_root
 
     orig_path = os.path.join(root_folder, f"demonstration_{args.demo_num}/demo_{args.demo_num}.h5")
     suffix = f"_{args.suffix}" if args.suffix else ""

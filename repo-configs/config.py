@@ -4,3 +4,6 @@ from pathlib import Path
 # Derive the default from this file so moving both checkouts needs no edits.
 # Set this to an absolute parent directory only for a nonstandard layout.
 repo_root = str(Path(__file__).resolve().parents[2])
+
+# Recording and processed demonstration storage.
+data_root = "/data3/extracted_data"

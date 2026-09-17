@@ -7,7 +7,7 @@ cd deoxys_control/deoxys && ./auto_scripts/auto_arm.sh config/charmander.yml
 cd deoxys_control/deoxys && ./auto_scripts/auto_gripper.sh config/charmander.yml
 """
 
-from openteach.repo_config import repo_root
+from openteach.repo_config import data_root
 
 import argparse
 import json
@@ -76,7 +76,7 @@ def get_arm_control_kwargs(control_mode, arm_action, target_pose, gripper_cmd):
 def get_demo_filename(demo_num):
     if demo_num.endswith(".h5"):
         return os.path.expanduser(demo_num)
-    return f"{repo_root}/openteach/extracted_data/demonstration_{demo_num}/demo_{demo_num}.h5"
+    return f"{data_root}/demonstration_{demo_num}/demo_{demo_num}.h5"
 
 
 def get_demo_number(filename):

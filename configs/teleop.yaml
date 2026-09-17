@@ -9,7 +9,7 @@ defaults:
 operate: true
 sim_env: false
 run_xela: false
-storage_location: extracted_data/
+storage_location: .  # Relative to data_root in repo-configs/config.py
 record:
 control_mode: absolute_eef_pose_to_delta
 

@@ -6,6 +6,7 @@ import hydra
 from omegaconf import open_dict
 
 from openteach.constants import *
+from openteach.repo_config import data_root
 
 from .recorders.image import DepthImageRecorder, FishEyeImageRecorder, RGBImageRecorder
 from .recorders.robot_state import RobotInformationRecord
@@ -161,6 +162,7 @@ class TeleOperator(ProcessInstantiator):
         for operator_config in self.configs.robot.operators:
             with open_dict(operator_config):
                 operator_config.record = record
+                operator_config.storage_location = self.configs.get("storage_location", ".")
             self.processes.append(Process(
                 target = self._start_component,
                 args = (operator_config,)
@@ -177,7 +179,7 @@ class Collector(ProcessInstantiator):
         super().__init__(configs)
         self.demo_num = demo_num
         self._storage_path = os.path.join(
-            repo_root, "openteach",
+            data_root,
             self.configs.storage_path,
             'demonstration_{}'.format(self.demo_num)
         )
